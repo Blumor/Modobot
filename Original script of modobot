@@ -1,0 +1,605 @@
+// Bot Discord de modération créé par Blumor.
+
+// Copyright, all rights reserved
+
+const config = require('./config.json');
+const Discord = require('discord.js');
+const bot = new Discord.Client({ disableEveryone: true });
+const ms = require('ms');
+const superagent = require('superagent');
+const fs = require('fs');
+const math = require('mathjs');
+const monnaie = require('./monnaie.json');
+const exp = require('./exp.json');
+const ytdl = require('ytdl-core');
+
+bot.on('ready', async () => {
+  console.log(`${bot.user.username} est en ligne !`);
+  bot.user.setActivity('!info');
+});
+
+bot.on('message', async message => {
+  if (message.author.bot) return;
+  if (message.channel.type === 'dm') return;
+  let prefix = config.prefix;
+
+  // Système de monnaie
+
+  if (!monnaie[message.author.id]) {
+    monnaie[message.author.id] = {
+      monnaie: 0
+    };
+  }
+
+  let baseMonnaie = Math.floor(Math.random() * 5) + 1;
+  let ajoutMonnaie = Math.floor(Math.random() * 3) + 1;
+
+  if (ajoutMonnaie === baseMonnaie) {
+    monnaie[message.author.id] = {
+      monnaie: monnaie[message.author.id].monnaie + ajoutMonnaie
+    };
+    fs.writeFile('./monnaie.json', JSON.stringify(monnaie), err => {
+      if (err) console.log(err);
+    });
+  }
+
+  // Système d'expérience
+
+  let addExp = Math.floor(Math.random() * 5) + 1;
+
+  if (!exp[message.author.id]) {
+    exp[message.author.id] = {
+      exp: 0,
+      niveau: 1
+    };
+  }
+
+  let currentExp = exp[message.author.id].exp;
+  let currentNiv = exp[message.author.id].niveau;
+  let nextLevel = currentNiv * 100;
+  exp[message.author.id].exp = currentExp + addExp;
+
+  if (nextLevel <= currentExp) {
+    exp[message.author.id].niveau += 1;
+    message.channel
+      .send(`Bravo, tu es passé au niveau ${currentNiv + 1} !`)
+      .then(msg => {
+        msg.delete(5000);
+      });
+  }
+
+  fs.writeFile('./exp.json', JSON.stringify(exp), err => {
+    if (err) console.log(err);
+  });
+
+  // Variables
+
+  let messageArray = message.content.split(' ');
+  let command = messageArray[0];
+  let args = messageArray.slice(1);
+
+  // Information sur le bot
+  if (command === `${prefix}info`) {
+    let botIcon = bot.user.displayAvatarURL;
+    let embed = new Discord.RichEmbed()
+      .setDescription('Informations sur le bot')
+      .setColor('#dc143c')
+      .setThumbnail(botIcon)
+      .addField('Nom du bot', bot.user.username)
+      .addField('Créer le', bot.user.createdAt)
+      .addField('Commandes :', '------------------------------------ ')
+      .addField(`${prefix}info`, 'Renvoie des informations sur le bot.')
+      .addField(`${prefix}infoserv`, 'Renvoie des informations sur le serveur.')
+      .addField(
+        `${prefix}report {@pseudo} {raison}`,
+        'Permet de reporter un utilisateur.'
+      )
+      .addField(
+        `${prefix}kick {@pseudo} {raison}`,
+        'Permet de kicker un utilisateur.'
+      )
+      .addField(
+        `${prefix}ban {@pseudo} {raison}`,
+        'Permet de bannir un utilisateur.'
+      )
+      .addField(
+        `${prefix}mute {@pseudo} {durée}`,
+        'Permet de muter une personne pendant une durée donnée.'
+      )
+      .addField(
+        `${prefix}addrole {@pseudo} {rôle}`,
+        'Ajouter un rôle à un utilisateur.'
+      )
+      .addField(
+        `${prefix}delrole {@pseudo} {rôle}`,
+        'Enlever un rôle à un utilisateur.'
+      )
+      .addField(`${prefix}chat`, 'Affiche une image de chat.')
+      .addField(`${prefix}chien`, 'Affiche une image de chien.')
+      .addField(
+        `${prefix}ask {Question} {?}`,
+        'Permet de poser une question fermée au bot.'
+      )
+      .addField(`${prefix}prefix`, 'Permet de changer le préfixe du bot.')
+      .addField(
+        `${prefix}clear`,
+        'Permet de supprimer un nombre défini de messages dans un canal.'
+      )
+      .addField(`${prefix}dis`, 'Permet de faire répéter un message au bot.')
+      .addField(`${prefix}maths`, 'Permet de réaliser des calculs.')
+      .addField(`${prefix}sondage`, 'Permet de créer des sondages.')
+      .addField(`${prefix}monnaie`, 'Affiche votre porte-monnaie.')
+      .addField(
+        `${prefix}niv`,
+        'Affiche votre avancée dans durant votre ascension des niveaux.'
+      );
+
+    return message.channel.send(embed);
+  }
+
+  // Information sur le serveur
+  if (command === `${prefix}infoserv`) {
+    let servIcon = message.guild.iconURL;
+    let servEmbed = new Discord.RichEmbed()
+      .setDescription('Information sur le serveur')
+      .setColor('#dc143c')
+      .setThumbnail(servIcon)
+      .addField('Nom du serveur', message.guild.name)
+      .addField('Nombre de membres', message.guild.memberCount)
+      .addField('Crée le', message.guild.createdAt)
+      .addField('Vous avez rejoint le', message.member.joinedAt);
+
+    return message.channel.send(servEmbed);
+  }
+
+  // Reporter un joueur
+  if (command === `${prefix}report`) {
+    let reportedUser = message.guild.member(
+      message.mentions.users.first() || message.guild.members.get(args[0])
+    );
+    if (!reportedUser) {
+      return message.channel.send("L'utilisateur n'existe pas !");
+    }
+    let reportedReason = args.join(' ').slice(22);
+    if (!reportedReason) {
+      return message.channel.send('Aucune raison spécifiée !');
+    }
+    let reportEmbed = new Discord.RichEmbed()
+      .setDescription('Reports')
+      .setColor('#dc143c')
+      .addField(
+        'Utilisateur reporté',
+        `${reportedUser} (ID: ${reportedUser.id})`
+      )
+      .addField(
+        'Utilisateur ayant reporté',
+        `${message.author} (ID: ${message.author.id})`
+      )
+      .addField('Canal', message.channel)
+      .addField('Raison', reportedReason);
+
+    let reportChannel = message.guild.channels.find(`name`, 'modération');
+    if (!reportChannel) {
+      return message.channel.send(
+        "Canal 'modération' introuvable. Veuillez créer ce canal"
+      );
+    }
+
+    message.delete();
+    reportChannel.send(reportEmbed);
+  }
+
+  // Kicker un joueur
+  if (command === `${prefix}kick`) {
+    let kickedUser = message.guild.member(
+      message.mentions.users.first() || message.guild.members.get(args[0])
+    );
+    if (!kickedUser) {
+      return message.channel.send("L'utilisateur n'existe pas !");
+    }
+    let kickReason = args.join(' ').slice(22);
+    if (!kickReason) {
+      return message.channel.send('Aucune raison spécifiée !');
+    }
+    if (!message.member.hasPermission('MANAGE_MESSAGES')) {
+      return message.channel.send(
+        "Vous n'avez pas les permissions pour faire cela !"
+      );
+    }
+    if (kickedUser.hasPermission('MANAGE_MESSAGES')) {
+      return message.channel.send('Vous ne pouvez pas kicker cette personne !');
+    }
+
+    let kickEmbed = new Discord.RichEmbed()
+      .setDescription('Kicks')
+      .setColor('#dc143c')
+      .addField('Utilisateur kické', `${kickedUser} (ID: ${kickedUser.id})`)
+      .addField(
+        'Utilisateur ayant kické',
+        `${message.author} (ID: ${message.author.id})`
+      )
+      .addField('Canal', message.channel)
+      .addField('Raison', kickReason);
+
+    let kickChannel = message.guild.channels.find(`name`, 'modération');
+    if (!kickChannel) {
+      return message.channel.send(
+        "Canal 'reports' introuvable. Veuillez créer ce canal"
+      );
+    }
+
+    message.delete();
+    message.guild.member(kickedUser).kick(kickReason);
+    kickChannel.send(kickEmbed);
+  }
+
+  // Bannir un joueur
+  if (command === `${prefix}ban`) {
+    let bannedUser = message.guild.member(
+      message.mentions.users.first() || message.guild.members.get(args[0])
+    );
+    if (!bannedUser) {
+      return message.channel.send("L'utilisateur n'existe pas !");
+    }
+    let banReason = args.join(' ').slice(22);
+    if (!banReason) {
+      return message.channel.send('Aucune raison spécifiée !');
+    }
+    if (!message.member.hasPermission('MANAGE_MESSAGES')) {
+      return message.channel.send(
+        "Vous n'avez pas les permissions pour faire cela !"
+      );
+    }
+    if (bannedUser.hasPermission('MANAGE_MESSAGES')) {
+      return message.channel.send('Vous ne pouvez pas bannir cette personne !');
+    }
+
+    let banEmbed = new Discord.RichEmbed()
+      .setDescription('Bans')
+      .setColor('#dc143c')
+      .addField('Utilisateur bannis', `${bannedUser} (ID: ${bannedUser.id})`)
+      .addField(
+        'Utilisateur ayant bannis',
+        `${message.author} (ID: ${message.author.id})`
+      )
+      .addField('Canal', message.channel)
+      .addField('Raison', banReason);
+
+    let banChannel = message.guild.channels.find(`name`, 'modération');
+    if (!banChannel) {
+      return message.channel.send(
+        "Canal 'reports' introuvable. Veuillez créer ce canal"
+      );
+    }
+
+    message.delete();
+    message.guild.member(bannedUser).ban(banReason);
+    banChannel.send(banEmbed);
+  }
+
+  // Code nucléaire
+  if (command === `${prefix}code_nucléaire`) {
+    return message.channel.send('5897 - 2645 - 3489');
+  }
+
+  // Mute
+  if (command === `${prefix}mute`) {
+    let mutedUser = message.guild.member(
+      message.mentions.users.first() || message.guild.members.get(args[0])
+    );
+    if (!mutedUser) {
+      return message.channel.send("L'utilisateur n'existe pas !");
+    }
+    let muteReason = args.join(' ').slice(22);
+    if (!muteReason) {
+      return message.channel.send('Aucune raison spécifiée !');
+    }
+    if (!message.member.hasPermission('MANAGE_MESSAGES')) {
+      return message.channel.send(
+        "Vous n'avez pas les permissions pour faire cela !"
+      );
+    }
+    if (mutedUser.hasPermission('MANAGE_MESSAGES')) {
+      return message.channel.send('Vous ne pouvez pas muter cette personne !');
+    }
+
+    let muteRole = message.guild.roles.find(`name`, 'muted');
+    if (!muteRole) {
+      try {
+        muteRole = await message.guild.createRole({
+          name: 'muted',
+          color: '#000',
+          permissions: []
+        });
+        message.guild.channels.forEach(async (channel, id) => {
+          await channel.overwritePermissions(muteRole, {
+            SEND_MESSAGES: false,
+            ADD_REACTIONS: false
+          });
+        });
+      } catch (e) {
+        console.log(e.stack);
+      }
+    }
+
+    let muteTime = args[1];
+    if (!muteTime) return message.channel.send('Aucune durée spécifiée !');
+
+    await mutedUser.addRole(muteRole.id);
+    message.channel.send(
+      `<@${mutedUser.id}> est muté pour ${ms(ms(muteTime))}.`
+    );
+
+    setTimeout(() => {
+      mutedUser.removeRole(muteRole.id);
+      message.channel.send(`<@${mutedUser.id}> n'est plus muté.`);
+    }, ms(muteTime));
+  }
+
+  // Addrole
+  if (command === `${prefix}addrole`) {
+    let memberRole = message.guild.member(
+      message.mentions.users.first() || message.guild.members.get(args[0])
+    );
+    if (!memberRole) {
+      return message.channel.send("L'utilisateur n'existe pas !");
+    }
+    let roleToAdd = args.join(' ').slice(22);
+    if (!roleToAdd) return message.channel.send('Aucun rôle spécifier.');
+    if (!message.member.hasPermission('MANAGE_MESSAGES')) {
+      return message.channel.send(
+        "Vous n'avez pas les permissions pour faire cela !"
+      );
+    }
+    if (memberRole.hasPermission('MANAGE_MESSAGES')) {
+      return message.channel.send(
+        'Vous ne pouvez pas ajouter de rôle à cette personne !'
+      );
+    }
+
+    let role = message.guild.roles.find(`name`, roleToAdd);
+    if (!role) return message.channel.send('Rôle introuvable !');
+
+    if (memberRole.roles.has(role.id))
+      return message.channel.send("L'utilisateur possède déjà ce rôle !");
+    await memberRole.addRole(role.id);
+
+    try {
+      await memberRole.send(
+        `Bravo, tu as reçu le rôle ${role.name} avec succès.`
+      );
+    } catch (e) {
+      message.channel.send(
+        `Bravo <@${memberRole}>, tu as reçu le rôle ${role.name}.`
+      );
+    }
+  }
+
+  // Removerole
+  if (command === `${prefix}delrole`) {
+    let memberRole = message.guild.member(
+      message.mentions.users.first() || message.guild.members.get(args[0])
+    );
+    if (!memberRole) {
+      return message.channel.send("L'utilisateur n'existe pas !");
+    }
+    let roleToAdd = args.join(' ').slice(22);
+    if (!roleToAdd) return message.channel.send('Aucun rôle spécifier.');
+    if (!message.member.hasPermission('MANAGE_MESSAGES')) {
+      return message.channel.send(
+        "Vous n'avez pas les permissions pour faire cela !"
+      );
+    }
+    if (memberRole.hasPermission('MANAGE_MESSAGES')) {
+      return message.channel.send(
+        'Vous ne pouvez pas ajouter de rôle à cette personne !'
+      );
+    }
+
+    let role = message.guild.roles.find(`name`, roleToAdd);
+    if (!role) return message.channel.send('Rôle introuvable !');
+
+    if (!memberRole.roles.has(role.id))
+      return message.channel.send("L'utilisateur ne possède pas ce rôle !");
+    await memberRole.removeRole(role.id);
+
+    try {
+      await memberRole.send(
+        `Désolé, tu ne possèdes plus le rôle ${role.name}.`
+      );
+    } catch (e) {
+      message.channel.send(
+        `Désolé <@${memberRole}>, tu ne possède plus le rôle ${role.name}.`
+      );
+    }
+  }
+
+  // Chat
+  if (command === `${prefix}chat`) {
+    let { body } = await superagent.get(`http://aws.random.cat//meow`);
+
+    let catEmbed = new Discord.RichEmbed()
+      .setColor('#dc143c')
+      .setTitle('Chat')
+      .setImage(body.file);
+
+    message.channel.send(catEmbed);
+  }
+
+  // Chien
+  if (command === `${prefix}chien`) {
+    let { body } = await superagent.get(`https://random.dog/woof.json`);
+
+    let dogEmbed = new Discord.RichEmbed()
+      .setColor('#dc143c')
+      .setTitle('Chien')
+      .setImage(body.url);
+
+    message.channel.send(dogEmbed);
+  }
+
+  // Ask
+  if (command === `${prefix}ask`) {
+    if (!args[1]) return message.reply('Entrez une question !');
+
+    let replies = ['Oui', 'Non'];
+    let question = args.slice(0).join(' ');
+    let res = Math.floor(Math.random() * replies.length);
+
+    let askEmbed = new Discord.RichEmbed()
+      .setAuthor(message.author.tag)
+      .setColor('#dc143c')
+      .addField('Question', question)
+      .addField('Réponse', replies[res]);
+
+    message.channel.send(askEmbed);
+  }
+
+  // Clear
+  if (command === `${prefix}clear`) {
+    if (!message.member.hasPermission('MANAGE_MESSAGES'))
+      return message.reply(
+        "Vous n'avez pas la permission d'exécuter cette commande !"
+      );
+    if (!args[0])
+      return message.channel.send(
+        'Nombre de message à supprimer non spécifié !'
+      );
+
+    message.channel.bulkDelete(args[0]).then(() => {
+      message.channel
+        .send(`***${args[0]} messages*** supprimés.`)
+        .then(msg => msg.delete(5000));
+    });
+  }
+
+  // Say
+  if (command === `${prefix}dis`) {
+    const messageToBot = args.join(' ');
+    message.delete().catch();
+    message.channel.send(messageToBot);
+  }
+
+  // Commande maths
+  if (command === `${prefix}maths`) {
+    if (!args[0]) return message.channel.send('Entrez un calcul !');
+    let calcul;
+
+    try {
+      calcul = math.eval(args.join(' '));
+    } catch (e) {
+      return message.channel.send('Veuillez entrer des nombres valides !');
+    }
+
+    const mathEmbed = new Discord.RichEmbed()
+      .setColor('#dc143c')
+      .addField('Calcul', args.join(' '))
+      .addField('Résultat', calcul);
+
+    message.channel.send(mathEmbed);
+  }
+
+  // Sondage
+  if (command === `${prefix}sondage`) {
+    if (!message.member.hasPermission('MANAGE_MESSAGES')) {
+      return message.channel.send(
+        "Vous n'avez pas les permissions pour faire cela !"
+      );
+    }
+    if (!args[0]) return message.channel.send('Merci de préciser un sondage !');
+
+    const pollEmbed = new Discord.RichEmbed()
+      .setTitle(`Sondage crée par ${message.author.username}`)
+      .setColor('#dc143c')
+      .setFooter('Appuyez sur les réactions ci-dessous.')
+      .setDescription(args.join(' '));
+
+    let msg = await message.channel.send(pollEmbed);
+    await msg.react('✅');
+    await msg.react('❌');
+  }
+
+  // Monnaie
+  if (command === `${prefix}monnaie`) {
+    if (!monnaie[message.author.id]) {
+      monnaie[message.author.id] = {
+        monnaie: 0
+      };
+    }
+
+    let userMonnaie = monnaie[message.author.id].monnaie;
+
+    let userMonnaieEmbed = new Discord.RichEmbed()
+      .setAuthor(message.author.username)
+      .setColor('#dc143c')
+      .addField('💰', userMonnaie);
+
+    message.channel.send(userMonnaieEmbed);
+  }
+
+  // Niveaux
+  if (command === `${prefix}niv`) {
+    const exp = require('./exp.json');
+    if (!exp[message.author.id]) {
+      exp[message.author.id] = {
+        exp: 0,
+        niveau: 1
+      };
+    }
+
+    let cExp = exp[message.author.id].exp;
+    let cNiv = exp[message.author.id].niveau;
+    let nextLevelUp = cNiv * 100;
+    let expNeededForLevelUp = nextLevelUp - cExp;
+
+    let nivEmbed = new Discord.RichEmbed()
+      .setAuthor(message.author.username, message.author.displayAvatarURL)
+      .setColor('#dc143c')
+      .addField('Niveau', cNiv, true)
+      .addField('Expérience', cExp, true)
+      .setFooter(
+        `${expNeededForLevelUp} points d'expérience requis pour le prochain niveau.`
+      );
+
+    message.channel.send(nivEmbed);
+  }
+
+  // Musique play
+  if (command === `${prefix}play`) {
+    if (!message.member.voiceChannel)
+      return message.channel.send('Connectez vous à un salon vocal !');
+    if (message.guild.me.voiceChannel)
+      return message.channel.send(
+        'Le bot est déjà connecté à un salon vocal !'
+      );
+    if (!args[0])
+      return message.channel.send('Merci de préciser un lien YouTube !');
+
+    const validate = await ytdl.validateURL(args[0]);
+    if (!validate)
+      return message.channel.send("Désolé, l'URL n'est pas valide !");
+
+    const info = await ytdl.getInfo(args[0]);
+    const connection = await message.member.voiceChannel.join();
+    const dispatcher = await connection.playStream(
+      ytdl(args[0], { filter: 'audioonly' })
+    );
+    message.channel.send(`Musique ajoutée : ${info.title}`);
+  }
+
+  // Musique stop
+  if (command === `${prefix}stop`) {
+    if (!message.member.voiceChannel)
+      return message.channel.send('Connectez vous à un salon vocal !');
+    if (!message.guild.me.voiceChannel)
+      return message.channel.send(
+        "Le bot n'est pas connecté à un salon vocal !"
+      );
+    if (message.guild.me.voiceChannelID !== message.member.voiceChannelID)
+      return message.channel.send("Vous n'êtes pas dans le même salon !");
+    message.guild.me.voiceChannel.leave();
+    message.delete();
+  }
+});
+
+bot.login(config.token);
