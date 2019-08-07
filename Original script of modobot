@@ -23,7 +23,7 @@ bot.on('message', async message => {
   if (message.channel.type === 'dm') return;
   let prefix = config.prefix;
 
-  // Système de monnaie
+  // Money System
 
   if (!monnaie[message.author.id]) {
     monnaie[message.author.id] = {
@@ -43,7 +43,7 @@ bot.on('message', async message => {
     });
   }
 
-  // Système d'expérience
+  // Experience System
 
   let addExp = Math.floor(Math.random() * 5) + 1;
 
@@ -78,7 +78,7 @@ bot.on('message', async message => {
   let command = messageArray[0];
   let args = messageArray.slice(1);
 
-  // Information sur le bot
+  // Information command
   if (command === `${prefix}info`) {
     let botIcon = bot.user.displayAvatarURL;
     let embed = new Discord.RichEmbed()
@@ -137,7 +137,7 @@ bot.on('message', async message => {
     return message.channel.send(embed);
   }
 
-  // Information sur le serveur
+  // Server information command
   if (command === `${prefix}infoserv`) {
     let servIcon = message.guild.iconURL;
     let servEmbed = new Discord.RichEmbed()
@@ -152,7 +152,7 @@ bot.on('message', async message => {
     return message.channel.send(servEmbed);
   }
 
-  // Reporter un joueur
+  // Report command
   if (command === `${prefix}report`) {
     let reportedUser = message.guild.member(
       message.mentions.users.first() || message.guild.members.get(args[0])
@@ -189,7 +189,7 @@ bot.on('message', async message => {
     reportChannel.send(reportEmbed);
   }
 
-  // Kicker un joueur
+  // Kick command
   if (command === `${prefix}kick`) {
     let kickedUser = message.guild.member(
       message.mentions.users.first() || message.guild.members.get(args[0])
@@ -233,7 +233,7 @@ bot.on('message', async message => {
     kickChannel.send(kickEmbed);
   }
 
-  // Bannir un joueur
+  // Ban command
   if (command === `${prefix}ban`) {
     let bannedUser = message.guild.member(
       message.mentions.users.first() || message.guild.members.get(args[0])
@@ -277,12 +277,12 @@ bot.on('message', async message => {
     banChannel.send(banEmbed);
   }
 
-  // Code nucléaire
+  // (BONUS COMMAND) Nuclear code command
   if (command === `${prefix}code_nucléaire`) {
     return message.channel.send('5897 - 2645 - 3489');
   }
 
-  // Mute
+  // Mute comand
   if (command === `${prefix}mute`) {
     let mutedUser = message.guild.member(
       message.mentions.users.first() || message.guild.members.get(args[0])
@@ -336,7 +336,7 @@ bot.on('message', async message => {
     }, ms(muteTime));
   }
 
-  // Addrole
+  // Addrole command
   if (command === `${prefix}addrole`) {
     let memberRole = message.guild.member(
       message.mentions.users.first() || message.guild.members.get(args[0])
@@ -375,7 +375,7 @@ bot.on('message', async message => {
     }
   }
 
-  // Removerole
+  // Removerole command
   if (command === `${prefix}delrole`) {
     let memberRole = message.guild.member(
       message.mentions.users.first() || message.guild.members.get(args[0])
@@ -414,7 +414,7 @@ bot.on('message', async message => {
     }
   }
 
-  // Chat
+  // Command to show a cat picture
   if (command === `${prefix}chat`) {
     let { body } = await superagent.get(`http://aws.random.cat//meow`);
 
@@ -426,7 +426,7 @@ bot.on('message', async message => {
     message.channel.send(catEmbed);
   }
 
-  // Chien
+  // Command to show a dog picture
   if (command === `${prefix}chien`) {
     let { body } = await superagent.get(`https://random.dog/woof.json`);
 
@@ -438,7 +438,7 @@ bot.on('message', async message => {
     message.channel.send(dogEmbed);
   }
 
-  // Ask
+  // Ask command
   if (command === `${prefix}ask`) {
     if (!args[1]) return message.reply('Entrez une question !');
 
@@ -455,7 +455,7 @@ bot.on('message', async message => {
     message.channel.send(askEmbed);
   }
 
-  // Clear
+  // Clear command
   if (command === `${prefix}clear`) {
     if (!message.member.hasPermission('MANAGE_MESSAGES'))
       return message.reply(
@@ -473,14 +473,14 @@ bot.on('message', async message => {
     });
   }
 
-  // Say
+  // Repeat command
   if (command === `${prefix}dis`) {
     const messageToBot = args.join(' ');
     message.delete().catch();
     message.channel.send(messageToBot);
   }
 
-  // Commande maths
+  // Maths command
   if (command === `${prefix}maths`) {
     if (!args[0]) return message.channel.send('Entrez un calcul !');
     let calcul;
@@ -499,7 +499,7 @@ bot.on('message', async message => {
     message.channel.send(mathEmbed);
   }
 
-  // Sondage
+  // Survey command
   if (command === `${prefix}sondage`) {
     if (!message.member.hasPermission('MANAGE_MESSAGES')) {
       return message.channel.send(
@@ -519,7 +519,7 @@ bot.on('message', async message => {
     await msg.react('❌');
   }
 
-  // Monnaie
+  // Money info
   if (command === `${prefix}monnaie`) {
     if (!monnaie[message.author.id]) {
       monnaie[message.author.id] = {
@@ -537,7 +537,7 @@ bot.on('message', async message => {
     message.channel.send(userMonnaieEmbed);
   }
 
-  // Niveaux
+  // Level info
   if (command === `${prefix}niv`) {
     const exp = require('./exp.json');
     if (!exp[message.author.id]) {
@@ -564,7 +564,7 @@ bot.on('message', async message => {
     message.channel.send(nivEmbed);
   }
 
-  // Musique play
+  // Command to play music
   if (command === `${prefix}play`) {
     if (!message.member.voiceChannel)
       return message.channel.send('Connectez vous à un salon vocal !');
@@ -587,7 +587,7 @@ bot.on('message', async message => {
     message.channel.send(`Musique ajoutée : ${info.title}`);
   }
 
-  // Musique stop
+  // Command to stop music
   if (command === `${prefix}stop`) {
     if (!message.member.voiceChannel)
       return message.channel.send('Connectez vous à un salon vocal !');
